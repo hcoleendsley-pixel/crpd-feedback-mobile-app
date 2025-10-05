@@ -34,6 +34,10 @@ jobs:
           fileName: android/app/my-release-key.keystore
           encodedString: ${{ secrets.ANDROID_SIGNING_KEY }}
 
+      - name: Grant execute permission to gradlew
+        working-directory: ./android
+        run: chmod +x ./gradlew
+
       - name: Build Android Release Bundle
         working-directory: ./android
         run: ./gradlew bundleRelease
