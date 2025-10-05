@@ -1,17 +1,31 @@
 apply plugin: "com.android.application"
 
-react {
-    bundleAssetName = "index.android.bundle"
-    entryFile = "index.js"
-    enableStaging = false
-    devSupport = true
-}
+import java.nio.file.Files
+import java.nio.file.Paths
 
+// This applies the React Native plugin from the node_modules directory
+apply from: "../../node_modules/react-native/react.gradle"
+
+/**
+ * Set this to true to create four separate APKs instead of one,
+ * one for each native architecture. This is useful if you don't want to use App Bundles
+ * and want to have separate APKs for different architectures.
+ */
 def enableSeparateBuildPerCPUArchitecture = false
 
+/**
+ * The preferred build flavor of JavaScriptCore (JSC).
+ */
+def jscFlavor = 'org.webkit:android-jsc:+'
+
+/**
+ * The preferred build flavor of Hermes.
+ */
+def hermesFlavor = 'com.facebook.react:hermes-android'
+
 android {
-    ndkVersion rootProject.ext.has("ndkVersion") ? rootProject.ext.get("ndkVersion") : "23.1.7779620"
-    compileSdkVersion rootProject.ext.has("compileSdkVersion") ? rootProject.ext.get("compileSdkVersion") : 33
+    ndkVersion ProjectUtils.getNdkVersion(project)
+    compileSdkVersion ProjectUtils.getCompileSdk(project)
     namespace "com.mobile_app"
 
     signingConfigs {
@@ -27,19 +41,10 @@ android {
 
     defaultConfig {
         applicationId "com.mobile_app"
-        minSdkVersion rootProject.ext.has("minSdkVersion") ? rootProject.ext.get("minSdkVersion") : 21
-        targetSdkVersion rootProject.ext.has("targetSdkVersion") ? rootProject.ext.get("targetSdkVersion") : 33
+        minSdkVersion ProjectUtils.getMinSdk(project)
+        targetSdkVersion ProjectUtils.getTargetSdk(project)
         versionCode 1
         versionName "1.0"
-    }
-
-    splits {
-        abi {
-            reset()
-            enable enableSeparateBuildPerCPUArchitecture
-            universalApk false
-            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
-        }
     }
 
     buildTypes {
@@ -57,7 +62,16 @@ android {
 }
 
 dependencies {
+    // The version of KSP and its processor that this project uses
+    def kspVersion = "1.9.22-1.0.17"
     implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
+    // The version of React Native you are using
     implementation "com.facebook.react:react-android"
+    // The version of Hermes you are using
     implementation "com.facebook.react:hermes-android"
+
+    if (ProjectUtils.isNewArchitectureEnabled(project)) {
+        // For Fabric, Fabric specific dependencies will be installed.
+    }
 }
+
