@@ -13,8 +13,8 @@ def enableSeparateBuildPerCPUArchitecture = false
 def jscFlavor = 'org.webkit:android-jsc:+'
 
 android {
-    ndkVersion "25.1.8937393"
-    compileSdkVersion 34
+    ndkVersion rootProject.ext.ndkVersion  // Use the version from root build.gradle
+    compileSdkVersion rootProject.ext.compileSdkVersion  // Use the version from root build.gradle
     namespace "com.mobile_app"
 
     signingConfigs {
@@ -30,8 +30,8 @@ android {
 
     defaultConfig {
         applicationId "com.mobile_app"
-        minSdkVersion 24
-        targetSdkVersion 34
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
     }
