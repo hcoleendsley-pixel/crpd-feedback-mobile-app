@@ -24,8 +24,8 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install dependencies reliably
+        run: npm ci
 
       - name: Decode Keystore
         id: decode_keystore
@@ -52,4 +52,17 @@ jobs:
         with:
           name: app-release
           path: android/app/build/outputs/bundle/release/app-release.aab
+```
+
+### **What to Do Next**
+
+Now that the workflow file is corrected, you just need to send this final fix to GitHub.
+
+1.  **Commit and push** this change to your `crpd-feedback-mobile-app` repository.
+    ```powershell
+    # Make sure you are in the mobile_app folder
+    git add .
+    git commit -m "Use npm ci for reliable dependency installation"
+    git push
+    
 
