@@ -49,7 +49,9 @@ dependencies {
     implementation "com.facebook.react:react-android"
     implementation "com.facebook.react:hermes-android"
     implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
-
+ implementation project(':react-native-safe-area-context')
+    implementation project(':react-native-vector-icons')
+    
     if (project.hasProperty("newArchEnabled") && project.newArchEnabled == "true") {
         // Dependencies for the New Architecture
     }
