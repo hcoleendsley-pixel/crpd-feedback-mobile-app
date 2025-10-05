@@ -1,0 +1,105 @@
+apply plugin: "com.android.application"
+apply from: "../../node_modules/react-native/react.gradle"
+
+import com.android.build.api.variant.ApplicationVariant
+import com.facebook.react.utils.ProjectUtils
+import java.nio.file.Files
+import java.nio.file.Paths
+
+/**
+ * This is the configuration block to customize your React Native Android app.
+ * By default you don't need to apply any configuration, just uncomment the lines you need.
+ */
+react {
+    /*
+     * The name of the generated asset file containing your JS bundle
+     */
+    bundleAssetName = "index.android.bundle"
+    /*
+     * The name of the generated asset file containing your JS bundle
+     */
+    entryFile = "index.js"
+    /*
+     * Whether staging is enabled.
+     * Staging allows you to test JS changes in release builds.
+     * It is recommended to leave this enabled without changing it manually.
+     */
+    enableStaging = false
+}
+
+/**
+ * Set this to true to create four separate APKs instead of one,
+ * one for each native architecture. This is useful if you don't want to use App Bundles
+ * and want to have separate APKs for different architectures.
+ */
+def enableSeparateBuildPerCPUArchitecture = false
+
+/**
+ * The preferred build flavor of JavaScriptCore (JSC).
+ */
+def jscFlavor = 'org.webkit:android-jsc:+'
+
+/**
+ * The preferred build flavor of Hermes.
+ */
+def hermesFlavor = 'com.facebook.react:hermes-android'
+
+android {
+    ndkVersion ProjectUtils.getNdkVersion(project)
+    compileSdkVersion ProjectUtils.getCompileSdk(project)
+    namespace "com.mobile_app"
+
+    signingConfigs {
+        release {
+            if (project.hasProperty('MYAPP_RELEASE_STORE_FILE')) {
+                storeFile file(MYAPP_RELEASE_STORE_FILE)
+                storePassword MYAPP_RELEASE_STORE_PASSWORD
+                keyAlias MYAPP_RELEASE_KEY_ALIAS
+                keyPassword MYAPP_RELEASE_KEY_PASSWORD
+            }
+        }
+    }
+
+    defaultConfig {
+        applicationId "com.mobile_app"
+        minSdkVersion ProjectUtils.getMinSdk(project)
+        targetSdkVersion ProjectUtils.getTargetSdk(project)
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            // Your release build configuration
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+
+    packagingOptions {
+        pickFirst "**/libjsc.so"
+        pickFirst "**/libc++_shared.so"
+    }
+}
+
+dependencies {
+    // The version of KSP and its processor that this project uses
+    def kspVersion = "1.9.22-1.0.17"
+
+    // The version of React Native you are using
+    implementation "com.facebook.react:react-android"
+    // The version of Hermes you are using
+    implementation "com.facebook.react:hermes-android"
+
+    // Other dependencies
+    implementation fileTree(dir: "libs", include: ["*.jar"])
+    implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
+
+    debugImplementation("com.facebook.flipper:flipper:${FLIPPER_VERSION}")
+    debugImplementation("com.facebook.flipper:flipper-network-plugin:${FLIPPER_VERSION}") {
+        exclude group:'com.squareup.okhttp3', module:'okhttp'
+    }
+    debugImplementation("com.facebook.flipper:flipper-fresco-driver-plugin:${FLIPPER_VERSION}")
+}
+

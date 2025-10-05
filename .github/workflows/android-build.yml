@@ -1,0 +1,90 @@
+name: Build Android Release
+
+on:
+  push:
+    branches:
+      - "main" # Or "master", depending on your branch name
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Decode Keystore
+        id: decode_keystore
+        uses: timheuer/base64-to-file@v1.2
+        with:
+          fileName: android/app/my-release-key.keystore
+          encodedString: ${{ secrets.ANDROID_SIGNING_KEY }}
+
+      - name: Build Android Release Bundle
+        working-directory: ./android
+        run: ./gradlew bundleRelease
+        env:
+          MYAPP_RELEASE_STORE_FILE: my-release-key.keystore
+          MYAPP_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          MYAPP_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          MYAPP_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-release
+          path: mobile_app/android/app/build/outputs/bundle/release/app-release.aab
+```
+
+#### **Step 2: Securely Provide Your Signing Key to GitHub**
+
+You cannot upload your `my-release-key.keystore` file directly. We need to provide it securely using GitHub's "Secrets" feature.
+
+1.  **Encode Your Key:**
+    * Open a Command Prompt and run this command. It will copy the contents of your key to your clipboard in a special text format.
+        ```powershell
+        certutil -encode C:\PoliceFeedbackProject\mobile_app\android\app\my-release-key.keystore keystore.b64 && clip < keystore.b64 && del keystore.b64
+        ```
+2.  **Add the Secret to GitHub:**
+    * Go to your `feedbackend` repository on GitHub.
+    * Click **"Settings"** > **"Secrets and variables"** > **"Actions"**.
+    * Click **"New repository secret"**.
+    * For the **Name**, enter `ANDROID_SIGNING_KEY`.
+    * In the **Value** box, paste (`Ctrl + V`) the text that was just copied to your clipboard.
+    * Click **"Add secret"**.
+
+#### **Step 3: Add Your Passwords as Secrets**
+
+Repeat the process above to add the following secrets:
+
+* **Name:** `ANDROID_KEY_ALIAS` | **Value:** `my-key-alias`
+* **Name:** `ANDROID_KEY_PASSWORD` | **Value:** `your-password` (the password you created for the key)
+* **Name:** `ANDROID_STORE_PASSWORD` | **Value:** `your-password` (the same password again)
+
+
+
+#### **Step 4: Push to Start the Build**
+
+You're ready. All you need to do now is commit and push your new workflow file to GitHub.
+
+```powershell
+# Make sure you are in the mobile_app folder
+cd C:\PoliceFeedbackProject\mobile_app
+
+git add .
+git commit -m "Add cloud build workflow"
+git push
