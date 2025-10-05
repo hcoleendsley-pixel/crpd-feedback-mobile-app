@@ -13,9 +13,34 @@ def enableSeparateBuildPerCPUArchitecture = false
 def jscFlavor = 'org.webkit:android-jsc:+'
 
 android {
-    ndkVersion rootProject.ext.ndkVersion  // Use the version from root build.gradle
-    compileSdkVersion rootProject.ext.compileSdkVersion  // Use the version from root build.gradle
+    ndkVersion rootProject.ext.ndkVersion
+    compileSdkVersion rootProject.ext.compileSdkVersion
     namespace "com.mobile_app"
+
+    // Add this block to configure C++ standard
+    defaultConfig {
+        applicationId "com.mobile_app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+        
+        // Add C++ configuration
+        externalNativeBuild {
+            cmake {
+                cppFlags "-std=c++20"
+                arguments "-DANDROID_STL=c++_shared"
+            }
+        }
+    }
+
+    // Add this to specify CMake version
+    externalNativeBuild {
+        cmake {
+            path "src/main/jni/CMakeLists.txt"
+            version "3.22.1"
+        }
+    }
 
     signingConfigs {
         release {
@@ -26,14 +51,6 @@ android {
                 keyPassword MYAPP_RELEASE_KEY_PASSWORD
             }
         }
-    }
-
-    defaultConfig {
-        applicationId "com.mobile_app"
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
     }
 
     buildTypes {
