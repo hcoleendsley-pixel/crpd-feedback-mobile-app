@@ -1,7 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   SafeAreaView,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -11,310 +10,347 @@ import {
   Alert,
   FlatList,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-// Main App Component: Shows the officer list and search
-function App() {
-  const [searchTerm, setSearchTerm] = useState('');
+// IMPORTANT: Replace with your actual live Render.com URL
+const API_BASE_URL = 'https://feedbackend-kqls.onrender.com';
+
+// ## COMPONENT 1: UserView ##
+// Moved outside the App component to prevent re-rendering on state change.
+// It now receives all necessary data and functions as props.
+const UserView = ({ searchTerm, setSearchTerm, officers, onSelectOfficer }) => {
+  const renderOfficerItem = ({ item }) => (
+    <TouchableOpacity onPress={() => onSelectOfficer(item)} style={styles.officerCard}>
+      <View style={styles.officerInfo}>
+        <Text style={styles.officerName}>{`${item.first_name} ${item.last_name}`}</Text>
+        <Text style={styles.officerTitle}>{item.job_title}</Text>
+      </View>
+      <View style={styles.officerRating}>
+        <Text style={styles.ratingText}>{item.avg_rating > 0 ? parseFloat(item.avg_rating).toFixed(1) : 'N/A'}</Text>
+        <Icon name="star" size={16} color="#fbbf24" />
+      </View>
+      <Icon name="chevron-right" size={24} color="#9ca3af" />
+    </TouchableOpacity>
+  );
+
+  return (
+    <>
+      <View style={styles.searchContainer}>
+        <Icon name="search" size={24} color="#9ca3af" style={{ marginRight: 8 }} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by officer name..."
+          placeholderTextColor="#9ca3af"
+          value={searchTerm}
+          onChangeText={setSearchTerm}
+        />
+      </View>
+      <FlatList
+        data={officers}
+        renderItem={renderOfficerItem}
+        keyExtractor={item => item.id.toString()}
+        contentContainerStyle={{ paddingBottom: 20 }}
+      />
+    </>
+  );
+};
+
+// ## COMPONENT 2: FeedbackForm ##
+// Moved outside to solve the keyboard dismissal issue in the comment box.
+const FeedbackForm = ({ officer, feedback, setFeedback, submitting, onSubmit, onBack }) => (
+  <ScrollView
+    keyboardShouldPersistTaps="handled"
+    contentContainerStyle={{ paddingBottom: 20 }}
+  >
+    <TouchableOpacity onPress={onBack} style={styles.backButton}>
+      <Icon name="arrow-back" size={24} color="#2563eb" />
+      <Text style={styles.backButtonText}>Back to List</Text>
+    </TouchableOpacity>
+    <View style={styles.formCard}>
+      <Text style={styles.formOfficerName}>{`${officer.first_name} ${officer.last_name}`}</Text>
+      <Text style={styles.formOfficerTitle}>{officer.job_title}</Text>
+
+      <Text style={styles.label}>Rate your interaction</Text>
+      <View style={styles.starsContainer}>
+        {[1, 2, 3, 4, 5].map(star => (
+          <TouchableOpacity key={star} onPress={() => setFeedback({ ...feedback, rating: star })}>
+            <Icon name={feedback.rating >= star ? "star" : "star-border"} size={40} color={feedback.rating >= star ? "#fbbf24" : "#cbd5e1"} />
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Text style={styles.label}>Comments (optional)</Text>
+      <TextInput
+        style={styles.textArea}
+        placeholder="Describe your experience..."
+        placeholderTextColor="#9ca3af"
+        multiline
+        numberOfLines={4}
+        value={feedback.comment}
+        onChangeText={(text) => setFeedback({ ...feedback, comment: text })}
+        textAlignVertical="top"
+      />
+
+      <TouchableOpacity
+        onPress={onSubmit}
+        disabled={submitting || feedback.rating === 0}
+        style={[styles.submitButton, (submitting || feedback.rating === 0) && styles.submitButtonDisabled]}
+      >
+        <Text style={styles.submitButtonText}>{submitting ? 'Submitting...' : 'Submit Feedback'}</Text>
+      </TouchableOpacity>
+    </View>
+  </ScrollView>
+);
+
+// ## COMPONENT 3: AdminView ##
+// Moved outside for consistency and best practice.
+const AdminView = ({ data }) => (
+  <FlatList
+    data={data.officers}
+    keyExtractor={item => item.id.toString()}
+    ListHeaderComponent={() => (
+      <View style={styles.adminHeader}>
+        <View style={styles.statBox}>
+          <Text style={styles.statValue}>{data.total_feedback}</Text>
+          <Text style={styles.statLabel}>Total Feedback</Text>
+        </View>
+        <View style={styles.statBox}>
+          <Text style={styles.statValue}>{parseFloat(data.overall_average_rating).toFixed(2)}</Text>
+          <Text style={styles.statLabel}>Overall Avg. Rating</Text>
+        </View>
+      </View>
+    )}
+    renderItem={({ item }) => (
+      <View style={styles.adminCard}>
+        <View style={styles.adminOfficerInfo}>
+          <Text style={styles.officerName}>{`${item.first_name} ${item.last_name}`}</Text>
+          <View style={styles.officerRating}>
+            <Text style={styles.ratingText}>{item.avg_rating > 0 ? parseFloat(item.avg_rating).toFixed(1) : 'N/A'}</Text>
+            <Icon name="star" size={16} color="#fbbf24" />
+            <Text style={styles.reviewCount}>({item.feedback_count} reviews)</Text>
+          </View>
+        </View>
+        <View style={styles.feedbackList}>
+          {item.feedback.length > 0 ? item.feedback.map(fb => (
+            <View key={fb.id} style={styles.feedbackItem}>
+              <View style={styles.officerRating}>
+                {[...Array(5)].map((_, i) => <Icon key={i} name="star" size={16} color={i < fb.rating ? "#fbbf24" : "#e2e8f0"} />)}
+              </View>
+              <Text style={styles.feedbackText}>{fb.feedback_text || "No comment provided."}</Text>
+              <Text style={styles.feedbackDate}>{new Date(fb.created_at).toLocaleDateString()}</Text>
+            </View>
+          )) : <Text style={styles.noFeedbackText}>No feedback for this officer yet.</Text>}
+        </View>
+      </View>
+    )} />
+);
+
+
+// ## MAIN APP COMPONENT ##
+const App = () => {
+  const [currentView, setCurrentView] = useState('user'); // 'user' or 'admin'
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // User State
   const [officers, setOfficers] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedOfficer, setSelectedOfficer] = useState(null);
+  const [feedback, setFeedback] = useState({ rating: 0, comment: '' });
+  const [submitting, setSubmitting] = useState(false);
 
-  // Load officers when the app first starts
-  useEffect(() => {
-    loadOfficers();
-  }, []);
+  // Admin State
+  const [adminData, setAdminData] = useState({ officers: [], total_feedback: 0, overall_average_rating: 0 });
 
-  // Memoize the filtered list for better performance
-  const filteredOfficers = useMemo(() => {
-    if (!searchTerm) return officers;
-    return officers.filter(officer => {
-      const fullName = `${officer.first_name} ${officer.last_name}`.toLowerCase();
-      return fullName.includes(searchTerm.toLowerCase());
-    });
-  }, [officers, searchTerm]);
-
-  // Function to load officers from your backend server
   const loadOfficers = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const response = await fetch('https://feedbackend-kqls.onrender.com/api/officers');
+      const response = await fetch(`${API_BASE_URL}/api/officers-with-ratings`);
+      if (!response.ok) throw new Error('Failed to fetch officer data.');
       const data = await response.json();
       setOfficers(data);
-    } catch (error) {
-      Alert.alert('Connection Error', 'Failed to load officers. Please make sure your backend server is running.');
+    } catch (e) {
+      setError(e.message);
     } finally {
       setLoading(false);
     }
   };
-
-  // If an officer is selected, show the detail screen component
-  if (selectedOfficer) {
-    return (
-      <OfficerDetailScreen
-        officer={selectedOfficer}
-        onBack={() => setSelectedOfficer(null)}
-        onFeedbackSubmitted={() => {
-          // After submitting, go back to the list and refresh it
-          setSelectedOfficer(null);
-          loadOfficers();
-        }}
-      />
-    );
-  }
-
-  // Otherwise, show the main officer list screen
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1e3a8a" />
-      <View style={styles.header}>
-        <Icon name="local-police" size={28} color="#93c5fd" />
-        <Text style={styles.headerTitle}>Community Feedback Portal</Text>
-        <Text style={styles.headerSubtitle}>Cedar Rapids Police Department</Text>
-      </View>
-      <View style={styles.content}>
-        <View style={styles.searchSection}>
-           <Icon name="search" size={24} color="#9ca3af" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by officer name..."
-            placeholderTextColor="#9ca3af"
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-          />
-        </View>
-        {loading && officers.length === 0 ? (
-           <ActivityIndicator size="large" color="#1d4ed8" style={{marginTop: 50}} />
-        ) : (
-          <FlatList
-            data={filteredOfficers}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.officerCard} onPress={() => setSelectedOfficer(item)}>
-                <View style={{flex: 1}}>
-                  <Text style={styles.officerName}>{`${item.first_name} ${item.last_name}`}</Text>
-                  <Text style={styles.officerTitle}>{item.job_title}</Text>
-                </View>
-                <View style={styles.ratingBadge}>
-                    <Icon name="star" size={16} color="#fbbf24" />
-                    <Text style={styles.ratingText}>
-                        {item.average_rating.toFixed(1)}
-                    </Text>
-                </View>
-                 <Icon name="chevron-right" size={24} color="#9ca3af" />
-              </TouchableOpacity>
-            )}
-            keyExtractor={item => item.id.toString()}
-            ListHeaderComponent={<Text style={styles.listHeader}>{`Showing ${filteredOfficers.length} of ${officers.length} officers`}</Text>}
-            refreshing={loading}
-            onRefresh={loadOfficers}
-          />
-        )}
-      </View>
-    </SafeAreaView>
-  );
-}
-
-// Officer Detail Screen Component: Shows officer info and feedback form
-function OfficerDetailScreen({ officer, onBack, onFeedbackSubmitted }) {
-  const [rating, setRating] = useState(0);
-  const [feedbackText, setFeedbackText] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [feedbackList, setFeedbackList] = useState([]);
-  const [loadingFeedback, setLoadingFeedback] = useState(true);
-
-  useEffect(() => {
-    fetchFeedback();
-  }, []);
-
-  const fetchFeedback = async () => {
-    try {
-        const response = await fetch(`https://feedbackend-kqls.onrender.com/api/officers/${officer.id}/feedback`);
-        const data = await response.json();
-        setFeedbackList(data);
-    } catch (error) {
-        Alert.alert('Error', 'Could not load feedback.');
-    } finally {
-        setLoadingFeedback(false);
-    }
+  
+  const loadAdminData = async () => {
+      if (adminData.officers.length > 0) return; // Don't reload if already loaded
+      setLoading(true);
+      setError(null);
+      try {
+          const response = await fetch(`${API_BASE_URL}/api/admin/all-feedback`);
+          if (!response.ok) throw new Error('Failed to fetch admin data.');
+          const data = await response.json();
+          setAdminData(data);
+      } catch(e) {
+          setError(e.message);
+      } finally {
+          setLoading(false);
+      }
   };
 
-
-  const submitFeedback = async () => {
-    if (rating === 0) {
-      Alert.alert('Rating Required', 'Please select a star rating before submitting.');
-      return;
+  useEffect(() => {
+    loadOfficers();
+  }, []);
+  
+  // When an officer is de-selected, reset the feedback form state
+  useEffect(() => {
+    if (!selectedOfficer) {
+      setFeedback({ rating: 0, comment: '' });
     }
+  }, [selectedOfficer]);
+
+  const submitFeedbackHandler = async () => {
+    if (feedback.rating === 0) return;
     setSubmitting(true);
+    setError(null);
     try {
-      const response = await fetch('https://feedbackend-kqls.onrender.com/api/feedback', {
+      const response = await fetch(`${API_BASE_URL}/api/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          officer_id: officer.id,
-          rating,
-          feedback_text: feedbackText,
-          is_anonymous: isAnonymous,
+          officer_id: selectedOfficer.id,
+          rating: feedback.rating,
+          feedback_text: feedback.comment,
+          is_anonymous: 1,
         }),
       });
-      if (!response.ok) throw new Error('Server responded with an error.');
-      
-      Alert.alert('Feedback Submitted', 'Thank you for helping improve our community.', [
-        { text: 'OK', onPress: onFeedbackSubmitted }
-      ]);
-    } catch (error) {
-      Alert.alert('Submission Error', 'Could not submit feedback. Please try again.');
+      if (!response.ok) throw new Error('Failed to submit feedback.');
+      Alert.alert('Success', 'Thank you! Your feedback has been submitted.');
+      setSelectedOfficer(null);
+      loadOfficers(); // Refresh data
+    } catch (e) {
+      setError(e.message);
+      Alert.alert('Error', e.message);
     } finally {
       setSubmitting(false);
     }
   };
+  
+  const filteredOfficers = useMemo(() => {
+    if (!searchTerm) return officers;
+    return officers.filter(officer =>
+      `${officer.first_name} ${officer.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [officers, searchTerm]);
+
+
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <Icon name="security" size={40} color="#93c5fd" />
+      <View>
+        <Text style={styles.headerTitle}>Cedar Rapids PD</Text>
+        <Text style={styles.headerSubtitle}>Community Feedback Portal</Text>
+      </View>
+    </View>
+  );
+
+  const renderContent = () => {
+    if (loading) {
+      return <ActivityIndicator size="large" color="#2563eb" style={{marginTop: 50}}/>;
+    }
+    if (error) {
+      return <View style={styles.errorContainer}><Text style={styles.errorText}>{error}</Text></View>;
+    }
+    if (currentView === 'user') {
+      return selectedOfficer ? (
+        <FeedbackForm
+          officer={selectedOfficer}
+          feedback={feedback}
+          setFeedback={setFeedback}
+          submitting={submitting}
+          onSubmit={submitFeedbackHandler}
+          onBack={() => setSelectedOfficer(null)}
+        />
+      ) : (
+        <UserView
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          officers={filteredOfficers}
+          onSelectOfficer={setSelectedOfficer}
+        />
+      );
+    }
+    return <AdminView data={adminData} />;
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1e3a8a" />
-       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Icon name="arrow-back-ios" size={20} color="white" />
-          <Text style={styles.backButtonText}>Back to List</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#1e40af" />
+      {renderHeader()}
+      <View style={styles.toggleContainer}>
+        <TouchableOpacity
+          onPress={() => setCurrentView('user')}
+          style={[styles.toggleButton, currentView === 'user' && styles.toggleButtonActive]}
+        >
+          <Text style={[styles.toggleText, currentView === 'user' && styles.toggleTextActive]}>User View</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Officer Profile</Text>
+        <TouchableOpacity
+          onPress={() => { setCurrentView('admin'); loadAdminData(); }}
+          style={[styles.toggleButton, currentView === 'admin' && styles.toggleButtonActive]}
+        >
+          <Text style={[styles.toggleText, currentView === 'admin' && styles.toggleTextActive]}>Admin View</Text>
+        </TouchableOpacity>
       </View>
-      <ScrollView style={styles.content}>
-        <View style={styles.detailCard}>
-          <Text style={styles.detailName}>{`${officer.first_name} ${officer.last_name}`}</Text>
-          <Text style={styles.detailTitle}>{officer.job_title}</Text>
-        </View>
-        
-        <View style={styles.feedbackCard}>
-            <Text style={styles.sectionTitle}>Community Feedback Log</Text>
-            {loadingFeedback ? (
-                <ActivityIndicator size="small" color="#1d4ed8" />
-            ) : feedbackList.length === 0 ? (
-                <View style={styles.emptyState}>
-                    <Icon name="comment" size={24} color="#9ca3af" />
-                    <Text style={styles.emptyStateText}>No feedback has been submitted for this officer yet.</Text>
-                </View>
-            ) : (
-                feedbackList.map((fb, index) => (
-                    <View key={index} style={styles.feedbackItem}>
-                        <View style={styles.feedbackHeader}>
-                             <View style={styles.starRating}>
-                                {[...Array(5)].map((_, i) => (
-                                    <Icon key={i} name="star" size={16} color={i < fb.rating ? '#fbbf24' : '#e5e7eb'} />
-                                ))}
-                            </View>
-                            <Text style={styles.feedbackDate}>{new Date(fb.created_at).toLocaleDateString()}</Text>
-                        </View>
-                        <Text style={styles.feedbackComment}>{fb.feedback_text || "No comment provided."}</Text>
-                    </View>
-                ))
-            )}
-        </View>
 
-
-        <View style={styles.feedbackCard}>
-            <Text style={styles.sectionTitle}>Submit Your Feedback</Text>
-            <Text style={styles.sectionSubtitle}>1. Rate Your Interaction</Text>
-            <View style={styles.starsContainer}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                    <TouchableOpacity key={star} onPress={() => setRating(star)}>
-                         <Icon name={star <= rating ? "star" : "star-border"} size={40} color={star <= rating ? '#fbbf24' : '#cbd5e1'} />
-                    </TouchableOpacity>
-                ))}
-            </View>
-        </View>
-
-        <View style={styles.feedbackCard}>
-          <Text style={styles.sectionSubtitle}>2. Describe Your Experience (Optional)</Text>
-          <TextInput
-            style={styles.feedbackInput}
-            placeholder="Provide details about the interaction..."
-            placeholderTextColor="#9ca3af"
-            multiline
-            value={feedbackText}
-            onChangeText={setFeedbackText}
-          />
-        </View>
-
-        <View style={styles.feedbackCard}>
-            <Text style={styles.sectionSubtitle}>3. Submission Preference</Text>
-            <TouchableOpacity style={styles.checkboxContainer} onPress={() => setIsAnonymous(!isAnonymous)}>
-                <Icon name={isAnonymous ? "check-box" : "check-box-outline-blank"} size={28} color={isAnonymous ? '#1d4ed8' : '#9ca3af'} />
-                <Text style={styles.checkboxLabel}>Submit Anonymously</Text>
-            </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={[styles.submitButton, submitting && styles.disabledButton]} onPress={submitFeedback} disabled={submitting}>
-          {submitting ? <ActivityIndicator color="#fff" /> : 
-          <View style={{flexDirection: 'row', alignItems: 'center'}}>
-            <Icon name="send" size={20} color="white" style={{marginRight: 8}} />
-            <Text style={styles.buttonText}>Submit Feedback</Text>
-          </View>
-          }
-        </TouchableOpacity>
-      </ScrollView>
+      <View style={styles.container}>
+        {renderContent()}
+      </View>
     </SafeAreaView>
   );
-}
+};
 
+// Styles remain the same
 const styles = StyleSheet.create({
-  // Containers & Layout
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
-  content: { flex: 1, paddingHorizontal: 16 },
-  header: { backgroundColor: '#1e3a8a', padding: 16, borderBottomWidth: 1, borderBottomColor: '#1e40af', alignItems: 'center' },
-
-  // Typography
-  headerTitle: { fontSize: 22, fontWeight: 'bold', color: 'white', textAlign: 'center' },
-  headerSubtitle: { fontSize: 14, color: '#93c5fd', textAlign: 'center', marginTop: 4 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e2937', marginBottom: 12 },
-  sectionSubtitle: { fontSize: 16, fontWeight: '600', color: '#1e2937', marginBottom: 12 },
-  listHeader: { color: '#475569', paddingVertical: 8, fontWeight: '500' },
-
-  // Buttons
-  submitButton: { backgroundColor: '#16a34a', paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 10, flexDirection: 'row', justifyContent: 'center' },
-  disabledButton: { backgroundColor: '#9ca3af' },
-  buttonText: { color: 'white', fontSize: 16, fontWeight: '600' },
-  backButton: { position: 'absolute', left: 16, top: 16, zIndex: 1, flexDirection: 'row', alignItems: 'center' },
-  backButtonText: { color: 'white', fontSize: 16, marginLeft: 6 },
-
-  // Search & Inputs
-  searchSection: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 12, marginVertical: 16, borderWidth: 1, borderColor: '#e2e8f0' },
-  searchIcon: { paddingLeft: 12 },
-  searchInput: { flex: 1, padding: 14, fontSize: 16, color: '#1e2937' },
-  feedbackInput: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 12, fontSize: 16, minHeight: 100, textAlignVertical: 'top' },
-  
-  // Officer List Cards
-  officerCard: { backgroundColor: 'white', padding: 16, borderRadius: 12, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', elevation: 1 },
-  officerName: { fontSize: 16, fontWeight: '600', color: '#1e2937' },
-  officerTitle: { fontSize: 14, color: '#64748b' },
-  
-  // Rating Badge on List
-  ratingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fefce8', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginRight: 8, borderWidth: 1, borderColor: '#fde047' },
-  ratingText: { color: '#a16207', fontWeight: 'bold', fontSize: 14, marginLeft: 4 },
-
-  // Detail Screen Cards
-  detailCard: { backgroundColor: 'white', padding: 20, borderRadius: 12, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' },
-  detailName: { fontSize: 24, fontWeight: 'bold', color: '#1e2937' },
-  detailTitle: { fontSize: 16, color: '#475569', marginTop: 4 },
-  feedbackCard: { backgroundColor: 'white', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' },
-
-  // Feedback display
-  emptyState: { alignItems: 'center', paddingVertical: 20 },
-  emptyStateText: { marginTop: 8, color: '#64748b' },
-  feedbackItem: { borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingVertical: 12},
-  feedbackHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  starRating: { flexDirection: 'row' },
-  feedbackComment: { fontSize: 14, color: '#334155', fontStyle: 'italic', marginVertical: 4},
-  feedbackDate: { fontSize: 12, color: '#94a3b8' },
-
-
-  // Rating Stars
-  starsContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
-
-  // Checkbox
-  checkboxContainer: { flexDirection: 'row', alignItems: 'center' },
-  checkboxLabel: { fontSize: 16, color: '#334155', marginLeft: 10 },
+  safeArea: { flex: 1, backgroundColor: '#f3f4f6' },
+  container: { flex: 1, paddingHorizontal: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e40af', padding: 16, paddingTop: 20 },
+  headerTitle: { fontSize: 22, fontWeight: 'bold', color: 'white', marginLeft: 16 },
+  headerSubtitle: { fontSize: 14, color: '#a5b4fc', marginLeft: 16 },
+  toggleContainer: { flexDirection: 'row', padding: 4, margin: 16, backgroundColor: '#e5e7eb', borderRadius: 8 },
+  toggleButton: { flex: 1, paddingVertical: 10, borderRadius: 6 },
+  toggleButtonActive: { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1.41, elevation: 2 },
+  toggleText: { textAlign: 'center', fontWeight: '600', color: '#4b5563' },
+  toggleTextActive: { color: '#1e40af' },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorText: { color: 'red', fontSize: 16 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 8, paddingHorizontal: 12, marginBottom: 16, borderColor: '#e5e7eb', borderWidth: 1 },
+  searchInput: { flex: 1, height: 50, fontSize: 16, color: '#111827' },
+  officerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', padding: 16, borderRadius: 8, marginBottom: 12, borderColor: '#e5e7eb', borderWidth: 1 },
+  officerInfo: { flex: 1 },
+  officerName: { fontSize: 18, fontWeight: '600', color: '#111827' },
+  officerTitle: { fontSize: 14, color: '#6b7280', marginTop: 2 },
+  officerRating: { flexDirection: 'row', alignItems: 'center' },
+  ratingText: { fontSize: 16, fontWeight: 'bold', color: '#4b5563', marginRight: 4 },
+  backButton: { flexDirection: 'row', alignItems: 'center', padding: 16},
+  backButtonText: { fontSize: 16, fontWeight: '600', color: '#2563eb', marginLeft: 8 },
+  formCard: { backgroundColor: 'white', padding: 24, borderRadius: 12, margin: 16 },
+  formOfficerName: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', color: '#111827' },
+  formOfficerTitle: { fontSize: 16, color: '#6b7280', textAlign: 'center', marginBottom: 24 },
+  label: { fontSize: 16, fontWeight: '500', color: '#374151', marginBottom: 12 },
+  starsContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 24 },
+  textArea: { backgroundColor: '#f3f4f6', borderColor: '#d1d5db', borderWidth: 1, borderRadius: 8, padding: 12, minHeight: 120, textAlignVertical: 'top', fontSize: 16, color: '#111827' },
+  submitButton: { backgroundColor: '#2563eb', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 24 },
+  submitButtonDisabled: { backgroundColor: '#9ca3af' },
+  submitButtonText: { color: 'white', fontSize: 18, fontWeight: '600' },
+  adminHeader: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 },
+  statBox: { backgroundColor: 'white', flex: 1, marginHorizontal: 8, padding: 16, borderRadius: 8, alignItems: 'center', borderColor: '#e5e7eb', borderWidth: 1 },
+  statValue: { fontSize: 28, fontWeight: 'bold', color: '#1e40af' },
+  statLabel: { fontSize: 14, color: '#6b7280', marginTop: 4 },
+  adminCard: { backgroundColor: 'white', borderRadius: 8, marginBottom: 16, padding: 16, borderColor: '#e5e7eb', borderWidth: 1 },
+  adminOfficerInfo: { borderBottomColor: '#f3f4f6', borderBottomWidth: 1, paddingBottom: 12, marginBottom: 12 },
+  reviewCount: { fontSize: 14, color: '#6b7280', marginLeft: 8 },
+  feedbackList: {},
+  feedbackItem: { borderBottomColor: '#f3f4f6', borderBottomWidth: 1, paddingVertical: 12 },
+  feedbackText: { fontSize: 15, color: '#374151', fontStyle: 'italic', marginTop: 8 },
+  feedbackDate: { fontSize: 12, color: '#9ca3af', marginTop: 8 },
+  noFeedbackText: { fontStyle: 'italic', color: '#6b7280' },
 });
 
 export default App;
